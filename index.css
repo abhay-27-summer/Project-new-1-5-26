@@ -1,0 +1,41 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,jsx}'],
+  theme: {
+    extend: {
+      fontFamily: {
+        display: ['Fraunces', 'ui-serif', 'Georgia', 'serif'],
+        sans: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
+      colors: {
+        ink: {
+          50: '#fafaf7',
+          100: '#f3f2ec',
+          200: '#e6e4d9',
+          300: '#cdcabb',
+          400: '#9b9787',
+          500: '#6b6857',
+          600: '#3f3d33',
+          700: '#26241d',
+          800: '#161510',
+          900: '#0a0908',
+        },
+        accent: {
+          50: '#fdf3ee',
+          100: '#fbe4d6',
+          200: '#f5c2a3',
+          300: '#ee9b6f',
+          400: '#e8826b',
+          500: '#c5562a',
+          600: '#a4441f',
+          700: '#7e3318',
+        },
+      },
+      boxShadow: {
+        soft: '0 1px 2px rgba(15,15,15,0.04), 0 4px 12px rgba(15,15,15,0.04)',
+        card: '0 1px 0 rgba(15,15,15,0.04), 0 2px 6px rgba(15,15,15,0.04)',
+      },
+    },
+  },
+  plugins: [],
+};

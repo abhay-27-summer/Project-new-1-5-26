@@ -1,0 +1,118 @@
+import { Project } from '../models/Project.js';
+import { Task } from '../models/Task.js';
+import { User } from '../models/User.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+
+// GET /api/projects — list projects where I'm owner or member
+export const listProjects = asyncHandler(async (req, res) => {
+  const projects = await Project.find({
+    $or: [{ owner: req.userId }, { 'members.user': req.userId }],
+  })
+    .sort({ updatedAt: -1 })
+    .populate('owner', 'name email')
+    .populate('members.user', 'name email');
+
+  // Annotate each with the requester's role
+  const out = projects.map((p) => {
+    const obj = p.toJSON();
+    obj.myRole = p.roleOf(req.userId);
+    return obj;
+  });
+
+  res.json({ projects: out });
+});
+
+// POST /api/projects
+export const createProject = asyncHandler(async (req, res) => {
+  const { name, description } = req.body;
+  const project = await Project.create({
+    name,
+    description,
+    owner: req.userId,
+    members: [{ user: req.userId, role: 'admin' }],
+  });
+  await project.populate('owner', 'name email');
+  await project.populate('members.user', 'name email');
+  const obj = project.toJSON();
+  obj.myRole = 'admin';
+  res.status(201).json({ project: obj });
+});
+
+// GET /api/projects/:id
+export const getProject = asyncHandler(async (req, res) => {
+  await req.project.populate('owner', 'name email');
+  await req.project.populate('members.user', 'name email');
+  const obj = req.project.toJSON();
+  obj.myRole = req.projectRole;
+  res.json({ project: obj });
+});
+
+// PATCH /api/projects/:id  [admin]
+export const updateProject = asyncHandler(async (req, res) => {
+  const { name, description } = req.body;
+  if (name !== undefined) req.project.name = name;
+  if (description !== undefined) req.project.description = description;
+  await req.project.save();
+  res.json({ project: req.project });
+});
+
+// DELETE /api/projects/:id  [owner]
+export const deleteProject = asyncHandler(async (req, res) => {
+  await Task.deleteMany({ project: req.project._id });
+  await req.project.deleteOne();
+  res.json({ ok: true });
+});
+
+// POST /api/projects/:id/members  [admin]
+export const addMember = asyncHandler(async (req, res) => {
+  const { userId, role } = req.body;
+  const user = await User.findById(userId);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  if (req.project.owner.equals(user._id)) {
+    return res.status(400).json({ message: 'Owner is already a member' });
+  }
+  if (req.project.members.some((m) => m.user.equals(user._id))) {
+    return res.status(409).json({ message: 'User is already a member' });
+  }
+
+  req.project.members.push({ user: user._id, role });
+  await req.project.save();
+  await req.project.populate('members.user', 'name email');
+  res.status(201).json({ project: req.project });
+});
+
+// PATCH /api/projects/:id/members/:userId  [admin]
+export const updateMember = asyncHandler(async (req, res) => {
+  const { role } = req.body;
+  const m = req.project.members.find((m) => m.user.equals(req.params.userId));
+  if (!m) return res.status(404).json({ message: 'Member not found' });
+  if (req.project.owner.equals(req.params.userId)) {
+    return res.status(400).json({ message: 'Cannot change owner role' });
+  }
+  m.role = role;
+  await req.project.save();
+  await req.project.populate('members.user', 'name email');
+  res.json({ project: req.project });
+});
+
+// DELETE /api/projects/:id/members/:userId  [admin]
+export const removeMember = asyncHandler(async (req, res) => {
+  if (req.project.owner.equals(req.params.userId)) {
+    return res.status(400).json({ message: 'Cannot remove the project owner' });
+  }
+  const before = req.project.members.length;
+  req.project.members = req.project.members.filter((m) => !m.user.equals(req.params.userId));
+  if (req.project.members.length === before) {
+    return res.status(404).json({ message: 'Member not found' });
+  }
+  await req.project.save();
+
+  // Unassign tasks that were assigned to this user in this project
+  await Task.updateMany(
+    { project: req.project._id, assignee: req.params.userId },
+    { $set: { assignee: null } }
+  );
+
+  res.json({ ok: true });
+});

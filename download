@@ -1,0 +1,13 @@
+# Server
+NODE_ENV=development
+PORT=5000
+
+# Database (use MongoDB Atlas free tier in production)
+MONGODB_URI=mongodb://localhost:27017/team-task-manager
+
+# Auth
+JWT_SECRET=replace-with-a-long-random-string
+JWT_EXPIRES_IN=7d
+
+# Client (only needed in development)
+CLIENT_URL=http://localhost:5173

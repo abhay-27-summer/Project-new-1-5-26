@@ -1,0 +1,44 @@
+import mongoose from 'mongoose';
+
+const memberSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    role: { type: String, enum: ['admin', 'member'], default: 'member' },
+  },
+  { _id: false }
+);
+
+const projectSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true, maxlength: 120 },
+    description: { type: String, default: '', maxlength: 2000 },
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
+    members: { type: [memberSchema], default: [] },
+  },
+  { timestamps: true }
+);
+
+// Helper: returns the role of a given userId on this project (owner counts as admin)
+projectSchema.methods.roleOf = function (userId) {
+  if (!userId) return null;
+  if (this.owner.equals(userId)) return 'admin';
+  const m = this.members.find((m) => m.user.equals(userId));
+  return m ? m.role : null;
+};
+
+projectSchema.set('toJSON', {
+  virtuals: true,
+  versionKey: false,
+  transform: (_doc, ret) => {
+    ret.id = ret._id;
+    delete ret._id;
+    return ret;
+  },
+});
+
+export const Project = mongoose.model('Project', projectSchema);
